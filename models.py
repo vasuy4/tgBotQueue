@@ -7,6 +7,8 @@ from peewee import (
     SqliteDatabase,
     DateTimeField
 )
+from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
+
 
 from config import DB_PATH
 
@@ -35,8 +37,8 @@ class MyQueue(BaseModel):
 
 class UserPlace(BaseModel):
     pair_id = AutoField(primary_key=True)
-    myQueue = IntegerField()  # ForeignKeyField(MyQueue)
-    user = IntegerField()  # ForeignKeyField(User)
+    myQueue = IntegerField()
+    user = IntegerField()
     placeInQueue = IntegerField()
     place_time = DateTimeField(null=True)
 

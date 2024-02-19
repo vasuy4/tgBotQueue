@@ -84,7 +84,7 @@ def gen_markup(myQueue):
     return markup
 
 
-@bot.callback_query_handler(func=lambda call: True)
+@bot.callback_query_handler(func=lambda call: call.data.startswith('cb_'))
 def callback_query(call):
     """
     После нажатия на кнопку проверяется какая была нажата.
@@ -163,26 +163,7 @@ def callback_query(call):
         myQueue = MyQueue.select().where(MyQueue.title == call_data[2]).get()
 
         bot.answer_callback_query(call.id, "Answer is Exit")
-        try:
-            user_place = UserPlace.get(UserPlace.user == call.from_user.id and UserPlace.myQueue == myQueue.queue_id)
-            user_place.delete_instance()
-        except:
-            bot.send_message(call.from_user.id, "Вас нет в этой очереди!")
-            return
-
-        user = User.get(User.user_id == call.from_user.id)
-        num_queue_user = UserPlace.get(UserPlace.user == user.user_id)
-
-        user_places = UserPlace.select().where(
-            UserPlace.myQueue == myQueue.queue_id and UserPlace.placeInQueue >= num_queue_user.placeInQueue)
-
-        for i_place in user_places:
-            print(i_place)
-            i_place.placeInQueue -= 1
-            i_place.save()
-
-        res = tree_queue(myQueue)
-        bot.send_message(call.from_user.id, "Вы успешно вышли из очереди {}\n{}".format(myQueue, res))
+        exit_queue(bot, call, myQueue)
         try:
             user_states.pop(call.from_user.id)
         except KeyError:
@@ -220,30 +201,95 @@ def handle_inqueue(message):
 
     myQueue = MyQueue.select().where(MyQueue.queue_id == myQueue.queue_id).get()
     if message.text.upper() == 'выйти'.upper():
+        exit_queue(bot, message, myQueue)
 
-        user_place = UserPlace.get(UserPlace.user == message.from_user.id and UserPlace.myQueue == myQueue.queue_id)
-        user_place.delete_instance()
-        user = User.get(User.user_id == message.from_user.id)
-
-        try:
-            num_queue_user = UserPlace.get(UserPlace.user == user.user_id)
-
-            user_places = UserPlace.select().where(UserPlace.myQueue == myQueue.queue_id and UserPlace.placeInQueue >= num_queue_user.placeInQueue)
-
-            for i_place in user_places:
-                i_place.placeInQueue -= 1
-                i_place.save()
-        except BaseException as exc:
-            print(exc)
-            pass
-
-        res = tree_queue(myQueue)
-        bot.send_message(message.from_user.id, "Вы успешно вышли из очереди {}\n{}".format(myQueue, res))
         user_states.pop(message.from_user.id)
         bot.set_state(message.from_user.id, UserState.base)
     else:
         bot.send_message(message.from_user.id, "Ёмаё, слово 'выйти' можешь нормально написать? Или же можешь вернуться"
                                                "в меню /start")
+
+
+
+def gen_markup_skip(myQueue, num_next):
+    """Кнопки под сообщением"""
+    markup = InlineKeyboardMarkup()
+    markup.row_width = 2
+    markup.add(InlineKeyboardButton("Иду-иду", callback_data="cbSkip_yes_{}_{}".format(myQueue, num_next)),
+               InlineKeyboardButton("Пропустить очередь", callback_data="cbSkip_no_{}_{}".format(myQueue, num_next)),)
+    return markup
+
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith('cbSkip'))
+def callback_query_skip(call):
+    """
+    Если выбран ответ 'да', то пользователь становится в статусе 'inqueue'
+    Если 'нет' ....эм, нужно доработать
+    """
+    call_data = call.data.split('_')
+    myQueue = MyQueue.select().where(MyQueue.title == call_data[2]).get()
+
+    if call_data[1] == "yes":
+        bot.answer_callback_query(call.id, "Answer is Yes")
+        bot.send_message(call.from_user.id, "Как закончите отвечать, напишите, пожалуйста 'выйти'")
+        user_states[call.from_user.id] = myQueue
+        bot.set_state(call.from_user.id, UserState.inqueue)
+    elif call_data[1] == "no":
+        bot.answer_callback_query(call.id, "Answer is Skip")
+        # num_next = int(call_data[3])
+        # num_next += 1
+        # print("next - ", num_next)
+        # notif_next(myQueue, num_next)
+
+
+def notif_next(myQueue, num_next):
+    """
+    Если предыдущий(1) пользователь вышел из очереди появляется это сообщение.
+    P.s. Нужно доработать, чтобы при нажатии на кнопку 'пропустить очередь', шёл следующий пользователь и так
+    до конца очереди.
+    """
+    try:
+        user_place = UserPlace.get(UserPlace.placeInQueue == 1 and UserPlace.myQueue == myQueue.queue_id)
+    except:
+        return
+    bot.send_message(user_place.user, "Очередь {} дошла до вас!".format(myQueue.title),
+                     reply_markup=gen_markup_skip(myQueue, num_next))
+
+
+def exit_queue(bot, call, myQueue):
+    """
+    Функция выхода из очереди. Удаляет пользователя из очереди, запускает напоминание следующему по счёту
+    пользователю, что его черёд (если предыдущий вышел первым).
+    """
+    notification_for_next = False
+    try:
+        user_place = UserPlace.get(UserPlace.user == call.from_user.id and UserPlace.myQueue == myQueue.queue_id)
+        if user_place.placeInQueue == 1:
+            notification_for_next = True
+        user_place.delete_instance()
+    except:
+        bot.send_message(call.from_user.id, "Вас нет в этой очереди!")
+        return
+
+    if notification_for_next:
+        notif_next(myQueue, 1)
+
+    user = User.get(User.user_id == call.from_user.id)
+    bnum_queue = True
+    try:
+        num_queue_user = UserPlace.get(UserPlace.user == user.user_id)
+    except:
+        bnum_queue = False
+    if bnum_queue:
+        user_places = UserPlace.select().where(
+            (UserPlace.myQueue == myQueue.queue_id) & (UserPlace.placeInQueue >= num_queue_user.placeInQueue))
+        for i_place in user_places:
+            i_place.placeInQueue -= 1
+            i_place.save()
+
+    res = tree_queue(myQueue)
+    bot.send_message(call.from_user.id, "Вы успешно вышли из очереди {}\n{}".format(myQueue, res))
+
 
 @bot.message_handler(state="*")
 def help_response(message):
