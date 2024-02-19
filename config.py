@@ -1,5 +1,5 @@
 DB_PATH = "database.db"
-BOT_TOKEN = "BOT_TOKEN"
+BOT_TOKEN = "zxc"
 
 DEFAULT_COMMANDS = (
     ("start", "Начало"),
