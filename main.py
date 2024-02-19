@@ -16,6 +16,7 @@ bot = TeleBot(BOT_TOKEN, state_storage=state_storage)
 
 @bot.message_handler(state="*", commands=["start"])
 def handle_start(message: Message) -> None:
+    """Регистрация пользователя в БД, если его там ещё нет."""
     user_id = message.from_user.id
     username = message.from_user.username
     first_name = message.from_user.first_name
@@ -39,6 +40,7 @@ def handle_start(message: Message) -> None:
 
 @bot.message_handler(state="*", commands=["help"])
 def handle_help(message):
+    """Команда для справки"""
     bot.reply_to(message, "Через меня вы сможете создавать очереди, следить за ними.\n"
                           "Управляйте мной этими командами:\n\n"
                           "/select - выбрать очередь\n"
@@ -47,6 +49,7 @@ def handle_help(message):
 
 @bot.message_handler(state="*", commands=["show"])
 def handle_show_queues(message):
+    """Показывает все очереди после команды от пользователя /show"""
     user_id = message.from_user.id
     user = User.get_or_none(User.user_id == user_id)
     if user is None:
@@ -59,6 +62,7 @@ def handle_show_queues(message):
 
 @bot.message_handler(state="*", commands=["select"])
 def handle_select(message):
+    """Выводит список очередей, переносит статус пользователя в статус выбора очереди."""
     user_id = message.from_user.id
     user = User.get_or_none(User.user_id == user_id)
     if user is None:
@@ -71,6 +75,7 @@ def handle_select(message):
 
 
 def gen_markup(myQueue):
+    """Кнопки под сообщением"""
     markup = InlineKeyboardMarkup()
     markup.row_width = 2
     markup.add(InlineKeyboardButton("Да", callback_data="cb_yes_{}".format(myQueue)),
@@ -81,6 +86,13 @@ def gen_markup(myQueue):
 
 @bot.callback_query_handler(func=lambda call: True)
 def callback_query(call):
+    """
+    После нажатия на кнопку проверяется какая была нажата.
+    Если "да", то добавление пользователя в конец очереди и переход в состояние "inQueue", если он имеет на это право.
+    Если "Выйти из очереди", то удаляет данного пользователя, находящегося ближе к началу очереди, если пользователь
+    в ней находится. При удалении смещает остальных пользователей на позицию. Переход в статус 'base'.
+    Если "Отмена", то возвращение в базовое состояние.
+    """
     call_data = call.data.split('_')
 
     if call_data[1] == "yes":
@@ -158,9 +170,14 @@ def callback_query(call):
             bot.send_message(call.from_user.id, "Вас нет в этой очереди!")
             return
 
-        user_places = UserPlace.select().where(UserPlace.myQueue == myQueue.queue_id)
+        user = User.get(User.user_id == call.from_user.id)
+        num_queue_user = UserPlace.get(UserPlace.user == user.user_id)
+
+        user_places = UserPlace.select().where(
+            UserPlace.myQueue == myQueue.queue_id and UserPlace.placeInQueue >= num_queue_user.placeInQueue)
 
         for i_place in user_places:
+            print(i_place)
             i_place.placeInQueue -= 1
             i_place.save()
 
@@ -170,6 +187,7 @@ def callback_query(call):
             user_states.pop(call.from_user.id)
         except KeyError:
             pass
+        bot.set_state(call.from_user.id, UserState.base)
     else:
         bot.answer_callback_query(call.id, "Answer is No")
         bot.set_state(call.from_user.id, UserState.base)
@@ -177,6 +195,7 @@ def callback_query(call):
 
 @bot.message_handler(state=UserState.choice)
 def choice_queue(message):
+    """Ожидает ввод существующего ID очереди. Подтверждение становления в очередь через кнопки."""
     try:
         queue_id = int(message.text)
     except:
@@ -196,6 +215,7 @@ def choice_queue(message):
 
 @bot.message_handler(state=UserState.inqueue)
 def handle_inqueue(message):
+    """Если было получено сообщение 'выйти', то удаляет пользователя из очереди. Смещает очередь."""
     myQueue = user_states.get(message.from_user.id, "DATA_ERROR")
 
     myQueue = MyQueue.select().where(MyQueue.queue_id == myQueue.queue_id).get()
@@ -206,23 +226,28 @@ def handle_inqueue(message):
         user = User.get(User.user_id == message.from_user.id)
 
         try:
-            num_queue_user = UserPlace.get(UserPlace.user == user).placeInQueue
-            user_places = UserPlace.select().where(UserPlace.myQueue == myQueue.queue_id and UserPlace.placeInQueue > num_queue_user.placeInQueue)
+            num_queue_user = UserPlace.get(UserPlace.user == user.user_id)
+
+            user_places = UserPlace.select().where(UserPlace.myQueue == myQueue.queue_id and UserPlace.placeInQueue >= num_queue_user.placeInQueue)
 
             for i_place in user_places:
                 i_place.placeInQueue -= 1
                 i_place.save()
-        except:
+        except BaseException as exc:
+            print(exc)
             pass
 
         res = tree_queue(myQueue)
         bot.send_message(message.from_user.id, "Вы успешно вышли из очереди {}\n{}".format(myQueue, res))
         user_states.pop(message.from_user.id)
         bot.set_state(message.from_user.id, UserState.base)
-
+    else:
+        bot.send_message(message.from_user.id, "Ёмаё, слово 'выйти' можешь нормально написать? Или же можешь вернуться"
+                                               "в меню /start")
 
 @bot.message_handler(state="*")
 def help_response(message):
+    """Ответ пользователю, если была введена неизвестная команда"""
     bot.send_message(message.from_user.id, "Я не знаю этой команды. Введите /help, если ничего не понимаете")
 
 
@@ -231,4 +256,5 @@ if __name__ == "__main__":
     create_models()
     bot.add_custom_filter(StateFilter(bot))
     bot.set_my_commands([BotCommand(*cmd) for cmd in DEFAULT_COMMANDS])
+
     bot.polling()
