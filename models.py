@@ -30,6 +30,7 @@ class MyQueue(BaseModel):
     """Класс очереди."""
     queue_id = AutoField(primary_key=True)
     title = CharField()
+    num_queue = IntegerField()
 
     def __str__(self):
         return str(self.title)
@@ -61,7 +62,7 @@ def all_tree_queue():
     queues = MyQueue.select()
     res = ''
     for qu in queues:
-        res += str(qu.queue_id) + " - " + str(qu.title) + "\n"
+        res += str(qu.num_queue) + " - " + str(qu.title) + "\n"
         query = UserPlace.select().where(UserPlace.myQueue == qu.queue_id)
         for user_place in query:
             user = User.get_or_none(User.user_id == user_place.user)
@@ -74,8 +75,8 @@ def create_models():
     db.create_tables(BaseModel.__subclasses__())
     queues = MyQueue.select()
     if not queues:
-        MyQueue.create(title="webQueue")
-        MyQueue.create(title="networksQueue")
+        MyQueue.create(title="webQueue", num_queue=1)
+        MyQueue.create(title="networksQueue", num_queue=2)
 
 
 def logging_decorator(enable_logging):

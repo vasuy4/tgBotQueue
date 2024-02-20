@@ -1,5 +1,5 @@
-from states import UserState
-from config import BOT_TOKEN, DEFAULT_COMMANDS, usernames
+from states import UserState, AdminState
+from config import BOT_TOKEN, DEFAULT_COMMANDS, usernames, ADMIN_PASSWORD, ADMIN_COMMANDS
 from models import User, MyQueue, create_models, UserPlace, tree_queue, all_tree_queue, logging_decorator
 
 import datetime
@@ -78,6 +78,93 @@ def handle_select(message):
     bot.send_message(message.from_user.id, "Выберете номер очереди:\n{}".format(res))
     bot.set_state(message.from_user.id, UserState.choice)
 
+
+@bot.message_handler(state="*", commands=["admin"])
+@logging_decorator(enable_logging)
+def handle_password_request(message):
+    """Запрос пароля для входа в режим админа"""
+    bot.send_message(message.from_user.id, "Введите пароль")
+    bot.set_state(message.from_user.id, AdminState.enterpassword)
+
+
+@bot.message_handler(state=AdminState.enterpassword)
+@logging_decorator(enable_logging)
+def handle_login_admin(message):
+    """Вход в режим админа"""
+    if message.text == ADMIN_PASSWORD:
+        bot.send_message(message.from_user.id, "Создатель, добро пожаловать!\n/qcreate - Создать новую очередь\n"
+                                               "/qdelete - Удалить старую очередь\n/udelete - Удалить пользователя из"
+                                               "очереди\n/user - Вернуться в режим пользователя")
+        bot.set_my_commands([BotCommand(*cmd) for cmd in ADMIN_COMMANDS])
+        bot.set_state(message.from_user.id, AdminState.admin)
+    else:
+        bot.send_message(message.from_user.id, "Ошибка входа!")
+
+
+@bot.message_handler(state=AdminState.admin, commands=["user"])
+@logging_decorator(enable_logging)
+def back_user(message):
+    bot.send_message(message.from_user.id, "Возвращение в режим пользователя")
+    bot.set_state(message.from_user.id, UserState.base)
+
+
+
+@bot.message_handler(state=AdminState.admin, commands=["qcreate"])
+@logging_decorator(enable_logging)
+def handle_create_queue_name_request(message):
+    """Запрос нового названия"""
+    bot.send_message(message.from_user.id, "Введите название новой очереди")
+    bot.set_state(message.from_user.id, AdminState.createq)
+
+
+@bot.message_handler(state=AdminState.createq)
+@logging_decorator(enable_logging)
+def handle_create_queue(message):
+    """Создание новой очереди"""
+    max_num_queue = MyQueue.select(MyQueue.num_queue).order_by(MyQueue.num_queue.desc()).get().num_queue
+    MyQueue.create(title=message.text, num_queue=max_num_queue+1)
+    resp_str = "Новая очередь {} успешно создана!\n{}".format(message.text, all_tree_queue())
+    bot.send_message(message.from_user.id, resp_str)
+    bot.set_state(message.from_user.id, AdminState.admin)
+
+
+@bot.message_handler(state=AdminState.admin, commands=["qdelete"])
+@logging_decorator(enable_logging)
+def handle_delete_queue_name_request(message):
+    """Запрос ID очереди"""
+    resp_str = "Введите ID очереди для удаления:\n{}".format(all_tree_queue())
+    bot.send_message(message.from_user.id, resp_str)
+    bot.set_state(message.from_user.id, AdminState.deleteq)
+
+
+@bot.message_handler(state=AdminState.deleteq)
+@logging_decorator(enable_logging)
+def handle_delete_queue(message):
+    """Удаление очереди"""
+    queue_nums = [my_queue.num_queue for my_queue in MyQueue.select()]
+    try:
+        delete_num = int(message.text)
+    except ValueError:
+        bot.send_message(message.from_user.id, "Ошибка ввода, переход в меню admin.")
+        bot.set_state(message.from_user.id, AdminState.admin)
+        return
+
+    if delete_num in queue_nums:
+        queue_delete = MyQueue.select().where(MyQueue.num_queue == delete_num).get()
+        num_queue = queue_delete.num_queue
+        name_queue = queue_delete.title
+        queue_delete.delete_instance()
+        bot.send_message(message.from_user.id, "Очередь {} успешно удалена!".format(name_queue))
+
+        queue_places = MyQueue.select().where(MyQueue.num_queue >= num_queue)
+        for i_place in queue_places:
+            i_place.num_queue -= 1
+            i_place.save()
+
+        bot.set_state(message.from_user.id, AdminState.admin)
+    else:
+        bot.send_message(message.from_user.id, "Очереди с таким ID не существует.")
+        bot.set_state(message.from_user.id, AdminState.admin)
 
 def gen_markup(myQueue):
     """Кнопки под сообщением"""
