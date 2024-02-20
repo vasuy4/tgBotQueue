@@ -276,7 +276,7 @@ def callback_query(call):
             day_of_week = now.weekday()
 
             if day_of_week != 2:
-                bot.send_message(call.from_user.id, "В очередь во вебу можно встать только в среду с 8:50 до 12:20")
+                bot.send_message(call.from_user.id, "В очередь по вебу можно встать только в среду с 8:50 до 12:20")
                 bot.set_state(call.from_user.id, UserState.base)
                 return
             elif not (datetime.time(8, 50) <= datetime.datetime.now().time() <= datetime.time(12, 20)):
