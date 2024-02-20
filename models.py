@@ -1,14 +1,12 @@
 from peewee import (
     AutoField,
     CharField,
-    ForeignKeyField,
     IntegerField,
     Model,
     SqliteDatabase,
     DateTimeField
 )
-from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
-
+from datetime import datetime
 
 from config import DB_PATH
 
@@ -21,6 +19,7 @@ class BaseModel(Model):
 
 
 class User(BaseModel):
+    """Класс пользователя"""
     user_id = IntegerField(primary_key=True)
     username = CharField()
     first_name = CharField()
@@ -28,6 +27,7 @@ class User(BaseModel):
 
 
 class MyQueue(BaseModel):
+    """Класс очереди."""
     queue_id = AutoField(primary_key=True)
     title = CharField()
 
@@ -36,6 +36,7 @@ class MyQueue(BaseModel):
 
 
 class UserPlace(BaseModel):
+    """Класс, который связывает пользователя и очередь."""
     pair_id = AutoField(primary_key=True)
     myQueue = IntegerField()
     user = IntegerField()
@@ -44,6 +45,7 @@ class UserPlace(BaseModel):
 
 
 def tree_queue(myQueue):
+    """Функция, которая возвращает строку очереди с её содержимым."""
     qu = MyQueue.select().where(MyQueue.queue_id == myQueue.queue_id).get()
     res = ''
 
@@ -55,6 +57,7 @@ def tree_queue(myQueue):
 
 
 def all_tree_queue():
+    """Функция, которая возвращает строку всех очередей с их содержимым."""
     queues = MyQueue.select()
     res = ''
     for qu in queues:
@@ -67,8 +70,31 @@ def all_tree_queue():
 
 
 def create_models():
+    """Функция, которая создаёт модели"""
     db.create_tables(BaseModel.__subclasses__())
     queues = MyQueue.select()
     if not queues:
         MyQueue.create(title="webQueue")
         MyQueue.create(title="networksQueue")
+
+
+def logging_decorator(enable_logging):
+    """Декоратор, который логирует данные, отправленные пользователем."""
+    def log_dec(func):
+        def wrapped(message):
+            if enable_logging:
+                try:
+                    data = message.text
+                except:
+                    data = message.data
+                name_log_file = 'log/chat_{}.log'.format(datetime.now().date())
+                with open(name_log_file, 'a') as f:
+                    new_log = "{} - user: @{} send message: {}\n".format(str(datetime.now().time()), str(message.from_user.username), str(data))
+                    try:
+                        f.write(new_log)
+                    except UnicodeError:
+                        pass
+            res = func(message)
+            return res
+        return wrapped
+    return log_dec

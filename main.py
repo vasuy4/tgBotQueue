@@ -1,6 +1,6 @@
 from states import UserState
 from config import BOT_TOKEN, DEFAULT_COMMANDS, usernames
-from models import User, MyQueue, create_models, UserPlace, tree_queue, all_tree_queue
+from models import User, MyQueue, create_models, UserPlace, tree_queue, all_tree_queue, logging_decorator
 
 import datetime
 from peewee import IntegrityError, fn
@@ -12,11 +12,13 @@ user_states = dict()
 state_storage = StateMemoryStorage()
 
 bot = TeleBot(BOT_TOKEN, state_storage=state_storage)
-
+enable_logging = True
 
 @bot.message_handler(state="*", commands=["start"])
+@logging_decorator(enable_logging)
 def handle_start(message: Message) -> None:
     """Регистрация пользователя в БД, если его там ещё нет."""
+
     user_id = message.from_user.id
     username = message.from_user.username
     first_name = message.from_user.first_name
@@ -39,6 +41,7 @@ def handle_start(message: Message) -> None:
 
 
 @bot.message_handler(state="*", commands=["help"])
+@logging_decorator(enable_logging)
 def handle_help(message):
     """Команда для справки"""
     bot.reply_to(message, "Через меня вы сможете создавать очереди, следить за ними.\n"
@@ -48,6 +51,7 @@ def handle_help(message):
 
 
 @bot.message_handler(state="*", commands=["show"])
+@logging_decorator(enable_logging)
 def handle_show_queues(message):
     """Показывает все очереди после команды от пользователя /show"""
     user_id = message.from_user.id
@@ -61,6 +65,7 @@ def handle_show_queues(message):
 
 
 @bot.message_handler(state="*", commands=["select"])
+@logging_decorator(enable_logging)
 def handle_select(message):
     """Выводит список очередей, переносит статус пользователя в статус выбора очереди."""
     user_id = message.from_user.id
@@ -85,6 +90,7 @@ def gen_markup(myQueue):
 
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith('cb_'))
+@logging_decorator(enable_logging)
 def callback_query(call):
     """
     После нажатия на кнопку проверяется какая была нажата.
@@ -175,6 +181,7 @@ def callback_query(call):
 
 
 @bot.message_handler(state=UserState.choice)
+@logging_decorator(enable_logging)
 def choice_queue(message):
     """Ожидает ввод существующего ID очереди. Подтверждение становления в очередь через кнопки."""
     try:
@@ -195,6 +202,7 @@ def choice_queue(message):
 
 
 @bot.message_handler(state=UserState.inqueue)
+@logging_decorator(enable_logging)
 def handle_inqueue(message):
     """Если было получено сообщение 'выйти', то удаляет пользователя из очереди. Смещает очередь."""
     myQueue = user_states.get(message.from_user.id, "DATA_ERROR")
@@ -216,11 +224,13 @@ def gen_markup_skip(myQueue, num_next):
     markup = InlineKeyboardMarkup()
     markup.row_width = 2
     markup.add(InlineKeyboardButton("Иду-иду", callback_data="cbSkip_yes_{}_{}".format(myQueue, num_next)),
-               InlineKeyboardButton("Пропустить очередь", callback_data="cbSkip_no_{}_{}".format(myQueue, num_next)),)
+               InlineKeyboardButton("Пропустить очередь", callback_data="cbSkip_no_{}_{}".format(myQueue, num_next)),
+               InlineKeyboardButton("Выйти из очереди", callback_data="cbSkip_exit_{}_{}".format(myQueue, num_next)),)
     return markup
 
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith('cbSkip'))
+@logging_decorator(enable_logging)
 def callback_query_skip(call):
     """
     Если выбран ответ 'да', то пользователь становится в статусе 'inqueue'
@@ -231,7 +241,8 @@ def callback_query_skip(call):
 
     if call_data[1] == "yes":
         bot.answer_callback_query(call.id, "Answer is Yes")
-        bot.send_message(call.from_user.id, "Как закончите отвечать, напишите, пожалуйста 'выйти'")
+        bot.send_message(call.from_user.id, "Как закончите отвечать, напишите, пожалуйста 'выйти' \nили воспользуйтесь"
+                                            " кнопкой 'выйти' в предыдущем сообщении.")
         user_states[call.from_user.id] = myQueue
         bot.set_state(call.from_user.id, UserState.inqueue)
     elif call_data[1] == "no":
@@ -240,6 +251,11 @@ def callback_query_skip(call):
         # num_next += 1
         # print("next - ", num_next)
         # notif_next(myQueue, num_next)
+    else:
+        bot.answer_callback_query(call.id, "Answer is Exit")
+        exit_queue(bot, call, myQueue)
+        bot.set_state(call.from_user.id, UserState.base)
+
 
 
 def notif_next(myQueue, num_next):
@@ -292,6 +308,7 @@ def exit_queue(bot, call, myQueue):
 
 
 @bot.message_handler(state="*")
+@logging_decorator(enable_logging)
 def help_response(message):
     """Ответ пользователю, если была введена неизвестная команда"""
     bot.send_message(message.from_user.id, "Я не знаю этой команды. Введите /help, если ничего не понимаете")
