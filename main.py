@@ -299,8 +299,8 @@ def callback_query(call):
             now = datetime.datetime.now()
             day_of_week = now.weekday()
             if day_of_week != 2 and day_of_week != 3:
-                bot.send_message(call.from_user.id, "В очередь по сетям можно встать только в среду и четверг с "
-                                                    "14:20 до 16:00 и 10:30 до 13:50 соответственно")
+                bot.send_message(call.from_user.id, "В очередь по сетям можно встать только в среду с 14:20 до 16:00 и "
+                                                    "четверг с 10:30 до 13:50 ")
                 bot.set_state(call.from_user.id, UserState.base)
                 return
             try:
