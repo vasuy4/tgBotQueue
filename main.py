@@ -217,7 +217,7 @@ def handle_delete_user_in_queue(message):
     """Удаление пользователя из очереди"""
     my_queue, my_user, id_queue, username = get_userqueue(bot, message)
     try:
-        user_place = UserPlace.get(UserPlace.user == my_user.user_id and UserPlace.myQueue == id_queue)
+        user_place = UserPlace.get((UserPlace.user == my_user.user_id) & (UserPlace.myQueue == id_queue))  # replace nd
         user_place.delete_instance()
     except:
         bot.send_message(message.from_user.id, "Пользователя нет в этой очереди!")
@@ -285,8 +285,8 @@ def callback_query(call):
                 return
 
             try:
-                last_user_place = UserPlace.select().where(UserPlace.myQueue == 1 and UserPlace.user == user.user_id).\
-                    order_by(UserPlace.pair_id.desc()).get()
+                last_user_place = UserPlace.select().where((UserPlace.myQueue == 1) & (UserPlace.user == user.user_id)).\
+                    order_by(UserPlace.pair_id.desc()).get()  # replace nd
                 last_time_user = last_user_place.place_time
                 if now - last_time_user < datetime.timedelta(days=1):
                     bot.send_message(call.from_user.id, "Похоже, что сегодня вы уже бронировали очередь, попробуйте через неделю)"
@@ -304,7 +304,8 @@ def callback_query(call):
                 bot.set_state(call.from_user.id, UserState.base)
                 return
             try:
-                user_last_number = UserPlace.select().where(UserPlace.myQueue == 2 and UserPlace.user == user.user_id).order_by(UserPlace.pair_id.desc()).get()
+                user_last_number = UserPlace.select().where((UserPlace.myQueue == 2) & (UserPlace.user == user.user_id)).order_by(UserPlace.pair_id.desc()).get()
+                # replace nd
                 user_last_number_place = user_last_number.placeInQueue
                 print(user_last_number_place, max_place)
                 if user_last_number_place - max_place < 5:
@@ -425,7 +426,7 @@ def notif_next(myQueue, num_next):
     до конца очереди.
     """
     try:
-        user_place = UserPlace.get(UserPlace.placeInQueue == 1 and UserPlace.myQueue == myQueue.queue_id)
+        user_place = UserPlace.get((UserPlace.placeInQueue == 1) & (UserPlace.myQueue == myQueue.queue_id))  # replace nd
     except:
         return
     bot.send_message(user_place.user, "Очередь {} дошла до вас!".format(myQueue.title),
@@ -439,7 +440,7 @@ def exit_queue(bot, call, myQueue):
     """
     notification_for_next = False
     try:
-        user_place = UserPlace.get(UserPlace.user == call.from_user.id and UserPlace.myQueue == myQueue.queue_id)
+        user_place = UserPlace.get((UserPlace.user == call.from_user.id) & (UserPlace.myQueue == myQueue.queue_id))
         if user_place.placeInQueue == 1:
             notification_for_next = True
         user_place.delete_instance()
