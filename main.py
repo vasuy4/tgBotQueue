@@ -271,7 +271,7 @@ def callback_query(call):
         if not max_place:
             max_place = 0
 
-        if str(myQueue) == "1webQueue":
+        if str(myQueue) == "webQueue":
             now = datetime.datetime.now()
             day_of_week = now.weekday()
 
@@ -295,7 +295,7 @@ def callback_query(call):
                     return
             except BaseException as exc:
                 print(exc)
-        elif str(myQueue) == "1networksQueue":
+        elif str(myQueue) == "networksQueue":
             now = datetime.datetime.now()
             day_of_week = now.weekday()
             if day_of_week != 2 and day_of_week != 3:
