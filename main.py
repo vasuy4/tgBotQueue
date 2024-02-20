@@ -1,6 +1,6 @@
 from states import UserState, AdminState
 from config import BOT_TOKEN, DEFAULT_COMMANDS, usernames, ADMIN_PASSWORD, ADMIN_COMMANDS
-from models import User, MyQueue, create_models, UserPlace, tree_queue, all_tree_queue, logging_decorator
+from models import User, MyQueue, create_models, UserPlace, tree_queue, all_tree_queue, logging_decorator, get_userqueue
 
 import datetime
 from peewee import IntegrityError, fn
@@ -93,7 +93,8 @@ def handle_login_admin(message):
     """Вход в режим админа"""
     if message.text == ADMIN_PASSWORD:
         bot.send_message(message.from_user.id, "Создатель, добро пожаловать!\n/qcreate - Создать новую очередь\n"
-                                               "/qdelete - Удалить старую очередь\n/udelete - Удалить пользователя из"
+                                               "/qdelete - Удалить старую очередь\n/uadd - добавить пользователя в "
+                                               "очередь\n/udelete - Удалить пользователя из "
                                                "очереди\n/user - Вернуться в режим пользователя")
         bot.set_my_commands([BotCommand(*cmd) for cmd in ADMIN_COMMANDS])
         bot.set_state(message.from_user.id, AdminState.admin)
@@ -165,6 +166,78 @@ def handle_delete_queue(message):
     else:
         bot.send_message(message.from_user.id, "Очереди с таким ID не существует.")
         bot.set_state(message.from_user.id, AdminState.admin)
+
+
+@bot.message_handler(state=AdminState.admin, commands=["uadd"])
+@logging_decorator(enable_logging)
+def handle_add_user_in_queue_request(message):
+    """Запрос ID очереди и ID пользователя"""
+    bot.send_message(message.from_user.id, "Введите ID очереди, с которой работаем, затем через пробел ник пользователя"
+                                           " без '@', которого надо добавить")
+    bot.set_state(message.from_user.id, AdminState.addu)
+
+
+@bot.message_handler(state=AdminState.addu)
+@logging_decorator(enable_logging)
+def handle_add_user_in_queue(message):
+    """Добавление пользователя в определённую очередь"""
+    my_queue, my_user, id_queue, username = get_userqueue(bot, message)
+
+    max_place = UserPlace.select(fn.Max(UserPlace.placeInQueue)).where(UserPlace.myQueue == id_queue).scalar()
+    if not max_place:
+        max_place = 0
+
+    UserPlace.create(
+        myQueue=id_queue,
+        user=my_user.user_id,
+        placeInQueue=max_place + 1,
+        place_time=datetime.datetime.now().replace(microsecond=0)
+    )
+    res = tree_queue(my_queue)
+
+    bot.send_message(message.from_user.id, "Пользователь @{} был успешно добавлен в очередь {}\n{}".format(
+        username, my_queue.title, res
+    ))
+    bot.set_state(message.from_user.id, AdminState.admin)
+
+
+
+@bot.message_handler(state=AdminState.admin, commands=["udelete"])
+@logging_decorator(enable_logging)
+def handle_delete_user_in_queue_request(message):
+    """Запрос ID очереди и ID пользователя"""
+    bot.send_message(message.from_user.id, "Введите ID очереди, с которой работаем, затем через пробел ник пользователя"
+                                           " без '@', которого надо удалить")
+    bot.set_state(message.from_user.id, AdminState.deleteu)
+
+
+@bot.message_handler(state=AdminState.deleteu)
+@logging_decorator(enable_logging)
+def handle_delete_user_in_queue(message):
+    """Удаление пользователя из очереди"""
+    my_queue, my_user, id_queue, username = get_userqueue(bot, message)
+    try:
+        user_place = UserPlace.get(UserPlace.user == my_user.user_id and UserPlace.myQueue == id_queue)
+        user_place.delete_instance()
+    except:
+        bot.send_message(message.from_user.id, "Пользователя нет в этой очереди!")
+        return
+    bnum_queue = True
+    try:
+        num_queue_user = UserPlace.get(UserPlace.user == my_user.user_id)
+    except:
+        bnum_queue = False
+    if bnum_queue:
+        user_places = UserPlace.select().where(
+            (UserPlace.myQueue == id_queue) & (UserPlace.placeInQueue >= num_queue_user.placeInQueue))
+        for i_place in user_places:
+            i_place.placeInQueue -= 1
+            i_place.save()
+
+    res = tree_queue(my_queue)
+    bot.send_message(message.from_user.id, "Пользователь {} был успешно удалён из очереди {}\n{}".format(username, my_queue, res))
+    bot.set_state(message.from_user.id, AdminState.admin)
+
 
 def gen_markup(myQueue):
     """Кнопки под сообщением"""
@@ -245,7 +318,7 @@ def callback_query(call):
             myQueue=myQueue,
             user=user,
             placeInQueue=max_place+1,
-            place_time=datetime.datetime.now()
+            place_time=datetime.datetime.now().replace(microsecond=0)
         )
 
         res = tree_queue(myQueue)

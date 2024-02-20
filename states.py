@@ -16,3 +16,5 @@ class AdminState(StatesGroup):
     # redact bot
     createq = State()
     deleteq = State()
+    addu = State()
+    deleteu = State()

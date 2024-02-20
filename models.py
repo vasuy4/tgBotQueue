@@ -99,3 +99,20 @@ def logging_decorator(enable_logging):
             return res
         return wrapped
     return log_dec
+
+
+def get_userqueue(bot, message):
+    try:
+        id_queue, username = message.text.split()
+        id_queue = int(id_queue)
+        username = str(username)
+    except ValueError:
+        bot.send_message(message.from_user.id, "Данные введены некорректно, попробуйте ещё раз.")
+        return
+    try:
+        my_queue = MyQueue.get(MyQueue.queue_id == id_queue)
+        my_user = User.get(User.username == username)
+    except:
+        bot.send_message(message.from_user.id, "Пользователь/очередь с заданными параметрами не найдены.")
+        return
+    return my_queue, my_user, id_queue, username
