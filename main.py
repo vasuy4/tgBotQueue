@@ -303,6 +303,14 @@ def callback_query(call):
                                                     "четверг с 10:30 до 13:50 ")
                 bot.set_state(call.from_user.id, UserState.base)
                 return
+            elif not (((datetime.time(14, 20) <= now.time() <= datetime.time(16, 00)) and day_of_week == 2) or
+                      ((datetime.time(10, 30) <= now.time() <= datetime.time(13, 50)) and day_of_week == 3)):
+                if day_of_week == 2:
+                    bot.send_message(call.from_user.id, "В очередь по сетям можно встать сегодня с 14:20 до 16:00")
+                elif day_of_week == 3:
+                    bot.send_message(call.from_user.id, "В очередь по сетям можно встать сегодня с 10:30 до 13:50")
+                bot.set_state(call.from_user.id, UserState.base)
+                return
             try:
                 user_last_number = UserPlace.select().where((UserPlace.myQueue == 2) & (UserPlace.user == user.user_id)).order_by(UserPlace.pair_id.desc()).get()
                 # replace nd
