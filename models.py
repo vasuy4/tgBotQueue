@@ -97,7 +97,16 @@ def logging_decorator(enable_logging):
                         f.write(new_log)
                     except UnicodeError:
                         pass
-            res = func(message)
+
+                try:
+                    res = func(message)
+                except BaseException as exc:
+                    name_log_error = "log/errors_{}.log".format(datetime.now().date())
+                    with open(name_log_error, 'a') as f:
+                        new_log = "{} - user: {}, send message: {}, error: {}\n".format(str(datetime.now().time()),
+                                                                                        str(message.from_user.username),
+                                                                                        str(data),
+                                                                                        exc)
             return res
         return wrapped
     return log_dec
