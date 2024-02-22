@@ -24,6 +24,7 @@ class User(BaseModel):
     username = CharField()
     first_name = CharField()
     last_name = CharField(null=True)
+    #true_name = CharField(null=True)
 
 
 class MyQueue(BaseModel):
@@ -107,6 +108,7 @@ def logging_decorator(enable_logging):
                                                                                         str(message.from_user.username),
                                                                                         str(data),
                                                                                         exc)
+                        f.write(new_log)
             return res
         return wrapped
     return log_dec

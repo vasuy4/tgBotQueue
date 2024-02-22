@@ -82,6 +82,12 @@ def handle_select(message):
     bot.set_state(message.from_user.id, UserState.choice)
 
 
+@bot.message_handler(state="*", commands=["setname"], func=lambda message: time.time() - message.date < 60)
+@logging_decorator(enable_logging)
+def handle_set_name_user(message):
+    pass
+
+
 @bot.message_handler(state="*", commands=["admin"], func=lambda message: time.time() - message.date < 60)
 @logging_decorator(enable_logging)
 def handle_password_request(message):
