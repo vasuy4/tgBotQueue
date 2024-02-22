@@ -7,6 +7,9 @@ from peewee import IntegrityError, fn
 from telebot import StateMemoryStorage, TeleBot
 from telebot.custom_filters import StateFilter
 from telebot.types import BotCommand, Message, InlineKeyboardMarkup, InlineKeyboardButton
+import time
+
+
 user_states = dict()
 
 state_storage = StateMemoryStorage()
@@ -14,7 +17,7 @@ state_storage = StateMemoryStorage()
 bot = TeleBot(BOT_TOKEN, state_storage=state_storage)
 enable_logging = True
 
-@bot.message_handler(state="*", commands=["start"])
+@bot.message_handler(state="*", commands=["start"], func=lambda message: time.time() - message.date < 60)
 @logging_decorator(enable_logging)
 def handle_start(message: Message) -> None:
     """Регистрация пользователя в БД, если его там ещё нет."""
@@ -40,7 +43,7 @@ def handle_start(message: Message) -> None:
 
 
 
-@bot.message_handler(state="*", commands=["help"])
+@bot.message_handler(state="*", commands=["help"], func=lambda message: time.time() - message.date < 60)
 @logging_decorator(enable_logging)
 def handle_help(message):
     """Команда для справки"""
@@ -50,7 +53,7 @@ def handle_help(message):
                           "/show - показать все очереди\n")
 
 
-@bot.message_handler(state="*", commands=["show"])
+@bot.message_handler(state="*", commands=["show"], func=lambda message: time.time() - message.date < 60)
 @logging_decorator(enable_logging)
 def handle_show_queues(message):
     """Показывает все очереди после команды от пользователя /show"""
@@ -64,7 +67,7 @@ def handle_show_queues(message):
     bot.send_message(message.from_user.id, "Список очередей:\n{}".format(res))
 
 
-@bot.message_handler(state="*", commands=["select"])
+@bot.message_handler(state="*", commands=["select"], func=lambda message: time.time() - message.date < 60)
 @logging_decorator(enable_logging)
 def handle_select(message):
     """Выводит список очередей, переносит статус пользователя в статус выбора очереди."""
@@ -79,7 +82,7 @@ def handle_select(message):
     bot.set_state(message.from_user.id, UserState.choice)
 
 
-@bot.message_handler(state="*", commands=["admin"])
+@bot.message_handler(state="*", commands=["admin"], func=lambda message: time.time() - message.date < 60)
 @logging_decorator(enable_logging)
 def handle_password_request(message):
     """Запрос пароля для входа в режим админа"""
@@ -87,7 +90,7 @@ def handle_password_request(message):
     bot.set_state(message.from_user.id, AdminState.enterpassword)
 
 
-@bot.message_handler(state=AdminState.enterpassword)
+@bot.message_handler(state=AdminState.enterpassword, func=lambda message: time.time() - message.date < 60)
 @logging_decorator(enable_logging)
 def handle_login_admin(message):
     """Вход в режим админа"""
@@ -95,14 +98,15 @@ def handle_login_admin(message):
         bot.send_message(message.from_user.id, "Создатель, добро пожаловать!\n/qcreate - Создать новую очередь\n"
                                                "/qdelete - Удалить старую очередь\n/uadd - добавить пользователя в "
                                                "очередь\n/udelete - Удалить пользователя из "
-                                               "очереди\n/user - Вернуться в режим пользователя")
+                                               "очереди\n/notification - Оповощение всем пользователям"
+                                               "\n/user - Вернуться в режим пользователя")
         bot.set_my_commands([BotCommand(*cmd) for cmd in ADMIN_COMMANDS])
         bot.set_state(message.from_user.id, AdminState.admin)
     else:
         bot.send_message(message.from_user.id, "Ошибка входа!")
 
 
-@bot.message_handler(state=AdminState.admin, commands=["user"])
+@bot.message_handler(state=AdminState.admin, commands=["user"], func=lambda message: time.time() - message.date < 60)
 @logging_decorator(enable_logging)
 def back_user(message):
     bot.send_message(message.from_user.id, "Возвращение в режим пользователя")
@@ -110,7 +114,7 @@ def back_user(message):
 
 
 
-@bot.message_handler(state=AdminState.admin, commands=["qcreate"])
+@bot.message_handler(state=AdminState.admin, commands=["qcreate"], func=lambda message: time.time() - message.date < 60)
 @logging_decorator(enable_logging)
 def handle_create_queue_name_request(message):
     """Запрос нового названия"""
@@ -118,7 +122,7 @@ def handle_create_queue_name_request(message):
     bot.set_state(message.from_user.id, AdminState.createq)
 
 
-@bot.message_handler(state=AdminState.createq)
+@bot.message_handler(state=AdminState.createq, func=lambda message: time.time() - message.date < 60)
 @logging_decorator(enable_logging)
 def handle_create_queue(message):
     """Создание новой очереди"""
@@ -129,7 +133,7 @@ def handle_create_queue(message):
     bot.set_state(message.from_user.id, AdminState.admin)
 
 
-@bot.message_handler(state=AdminState.admin, commands=["qdelete"])
+@bot.message_handler(state=AdminState.admin, commands=["qdelete"], func=lambda message: time.time() - message.date < 60)
 @logging_decorator(enable_logging)
 def handle_delete_queue_name_request(message):
     """Запрос ID очереди"""
@@ -138,7 +142,7 @@ def handle_delete_queue_name_request(message):
     bot.set_state(message.from_user.id, AdminState.deleteq)
 
 
-@bot.message_handler(state=AdminState.deleteq)
+@bot.message_handler(state=AdminState.deleteq, func=lambda message: time.time() - message.date < 60)
 @logging_decorator(enable_logging)
 def handle_delete_queue(message):
     """Удаление очереди"""
@@ -168,7 +172,7 @@ def handle_delete_queue(message):
         bot.set_state(message.from_user.id, AdminState.admin)
 
 
-@bot.message_handler(state=AdminState.admin, commands=["uadd"])
+@bot.message_handler(state=AdminState.admin, commands=["uadd"], func=lambda message: time.time() - message.date < 60)
 @logging_decorator(enable_logging)
 def handle_add_user_in_queue_request(message):
     """Запрос ID очереди и ID пользователя"""
@@ -177,7 +181,7 @@ def handle_add_user_in_queue_request(message):
     bot.set_state(message.from_user.id, AdminState.addu)
 
 
-@bot.message_handler(state=AdminState.addu)
+@bot.message_handler(state=AdminState.addu, func=lambda message: time.time() - message.date < 60)
 @logging_decorator(enable_logging)
 def handle_add_user_in_queue(message):
     """Добавление пользователя в определённую очередь"""
@@ -202,7 +206,7 @@ def handle_add_user_in_queue(message):
 
 
 
-@bot.message_handler(state=AdminState.admin, commands=["udelete"])
+@bot.message_handler(state=AdminState.admin, commands=["udelete"], func=lambda message: time.time() - message.date < 60)
 @logging_decorator(enable_logging)
 def handle_delete_user_in_queue_request(message):
     """Запрос ID очереди и ID пользователя"""
@@ -211,7 +215,7 @@ def handle_delete_user_in_queue_request(message):
     bot.set_state(message.from_user.id, AdminState.deleteu)
 
 
-@bot.message_handler(state=AdminState.deleteu)
+@bot.message_handler(state=AdminState.deleteu, func=lambda message: time.time() - message.date < 60)
 @logging_decorator(enable_logging)
 def handle_delete_user_in_queue(message):
     """Удаление пользователя из очереди"""
@@ -234,9 +238,19 @@ def handle_delete_user_in_queue(message):
             i_place.placeInQueue -= 1
             i_place.save()
 
+
     res = tree_queue(my_queue)
     bot.send_message(message.from_user.id, "Пользователь {} был успешно удалён из очереди {}\n{}".format(username, my_queue, res))
     bot.set_state(message.from_user.id, AdminState.admin)
+
+
+@bot.message_handler(state=AdminState.admin, commands=["notification"], func=lambda message: time.time() - message.date < 60)
+@logging_decorator(enable_logging)
+def handle_notification_for_all_users(message):
+    all_users = User.select()
+    for i_user in all_users:
+        bot.send_message(i_user.user_id, "Запись открыта!")
+
 
 
 def gen_markup(myQueue):
@@ -294,7 +308,7 @@ def callback_query(call):
                     bot.set_state(call.from_user.id, UserState.base)
                     return
             except BaseException as exc:
-                print(exc)
+                print("EXC:", exc)
         elif str(myQueue) == "networksQueue":
             now = datetime.datetime.now()
             day_of_week = now.weekday()
@@ -315,7 +329,6 @@ def callback_query(call):
                 user_last_number = UserPlace.select().where((UserPlace.myQueue == 2) & (UserPlace.user == user.user_id)).order_by(UserPlace.pair_id.desc()).get()
                 # replace nd
                 user_last_number_place = user_last_number.placeInQueue
-                print(user_last_number_place, max_place)
                 if user_last_number_place - max_place < 5:
                     bot.send_message(call.from_user.id, "Куда вы торопитесь? Между вами не прошло даже 5 человек")
                     bot.set_state(call.from_user.id, UserState.base)
@@ -349,7 +362,7 @@ def callback_query(call):
         bot.set_state(call.from_user.id, UserState.base)
 
 
-@bot.message_handler(state=UserState.choice)
+@bot.message_handler(state=UserState.choice, func=lambda message: time.time() - message.date < 60)
 @logging_decorator(enable_logging)
 def choice_queue(message):
     """Ожидает ввод существующего ID очереди. Подтверждение становления в очередь через кнопки."""
@@ -370,7 +383,7 @@ def choice_queue(message):
                      reply_markup=gen_markup(myQueue))
 
 
-@bot.message_handler(state=UserState.inqueue)
+@bot.message_handler(state=UserState.inqueue, func=lambda message: time.time() - message.date < 60)
 @logging_decorator(enable_logging)
 def handle_inqueue(message):
     """Если было получено сообщение 'выйти', то удаляет пользователя из очереди. Смещает очередь."""
@@ -476,7 +489,7 @@ def exit_queue(bot, call, myQueue):
     bot.send_message(call.from_user.id, "Вы успешно вышли из очереди {}\n{}".format(myQueue, res))
 
 
-@bot.message_handler(state="*")
+@bot.message_handler(state="*", func=lambda message: time.time() - message.date < 60)
 @logging_decorator(enable_logging)
 def help_response(message):
     """Ответ пользователю, если была введена неизвестная команда"""
@@ -487,6 +500,7 @@ if __name__ == "__main__":
     print("Bot started")
     create_models()
     bot.add_custom_filter(StateFilter(bot))
+
     bot.set_my_commands([BotCommand(*cmd) for cmd in DEFAULT_COMMANDS])
 
     bot.polling()
