@@ -62,11 +62,13 @@ def all_tree_queue():
     queues = MyQueue.select()
     res = ''
     for qu in queues:
-        res += str(qu.num_queue) + " - " + str(qu.title) + "\n"
+        res += "========================\n"
+        res += "{} - {}\n".format(str(qu.num_queue), str(qu.title))
         query = UserPlace.select().where(UserPlace.myQueue == qu.queue_id)
         for user_place in query:
             user = User.get_or_none(User.user_id == user_place.user)
             res += "  {}) {} @{} - {}\n".format(user_place.placeInQueue, user.first_name, user.username, user_place.place_time)
+    res += "========================"
     return res
 
 
