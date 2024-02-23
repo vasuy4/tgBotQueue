@@ -8,8 +8,9 @@ from peewee import (
 )
 from datetime import datetime
 import traceback
+import requests
 
-from config import DB_PATH
+from config import DB_PATH, AI_API_KEY
 
 db = SqliteDatabase(DB_PATH)
 
@@ -131,3 +132,28 @@ def get_userqueue(bot, message):
         bot.send_message(message.from_user.id, "Пользователь/очередь с заданными параметрами не найдены.")
         return
     return my_queue, my_user, id_queue, username
+
+
+def math_ai(message):
+    url = "https://robomatic-ai.p.rapidapi.com/api"
+
+    payload = {
+        "in": message.text,
+        "op": "in",
+        "cbot": "1",
+        "SessionID": "RapidAPI1",
+        "cbid": "1",
+        "key": "RHMN5hnQ4wTYZBGCF3dfxzypt68rVP",
+        "ChatSource": "RapidAPI",
+        "duration": "1"
+    }
+    headers = {
+        "content-type": "application/x-www-form-urlencoded",
+        "X-RapidAPI-Key": AI_API_KEY,
+        "X-RapidAPI-Host": "robomatic-ai.p.rapidapi.com"
+    }
+
+    response = requests.post(url, data=payload, headers=headers)
+    print(response.json()['out'])
+    return response
+    #print(response.json())
