@@ -6,6 +6,8 @@ class UserState(StatesGroup):
     base = State()
     choice = State()
     inqueue = State()
+    changename = State()
+
 
 
 class AdminState(StatesGroup):

@@ -17,6 +17,7 @@ state_storage = StateMemoryStorage()
 bot = TeleBot(BOT_TOKEN, state_storage=state_storage)
 enable_logging = True
 
+
 @bot.message_handler(state="*", commands=["start"], func=lambda message: time.time() - message.date < 60)
 @logging_decorator(enable_logging)
 def handle_start(message: Message) -> None:
@@ -85,7 +86,33 @@ def handle_select(message):
 @bot.message_handler(state="*", commands=["setname"], func=lambda message: time.time() - message.date < 60)
 @logging_decorator(enable_logging)
 def handle_set_name_user(message):
-    pass
+    bot.send_message(message.from_user.id, "Введите ваше имя, которое будет отображаться у всех.")
+    bot.set_state(message.from_user.id, UserState.changename)
+
+
+@bot.message_handler(state=UserState.changename, func=lambda message: time.time() - message.date < 60)
+@logging_decorator(enable_logging)
+def handle_set_name(message):
+    global user
+    user = User.get(User.user_id == message.from_user.id)
+    print(user.first_name)
+    user.first_name = message.text
+    print(user.first_name)
+    user.save()
+    bot.send_message(message.from_user.id, "Ваше имя успешно изменено на {}".format(message.text))
+    bot.set_state(message.from_user.id, UserState.base)
+
+
+@bot.message_handler(state="*", commands=["mygroup"], func=lambda message: time.time() - message.date < 60)
+@logging_decorator(enable_logging)
+def show_my_group(message):
+    all_users = User.select()
+    res = ''
+    k = 0
+    for i_user in all_users:
+        k+=1
+        res += '{}) {} @{}\n'.format(k, i_user.first_name, i_user.username)
+    bot.send_message(message.from_user.id, "Список вашей группы:\n{}".format(res))
 
 
 @bot.message_handler(state="*", commands=["admin"], func=lambda message: time.time() - message.date < 60)
@@ -117,7 +144,6 @@ def handle_login_admin(message):
 def back_user(message):
     bot.send_message(message.from_user.id, "Возвращение в режим пользователя")
     bot.set_state(message.from_user.id, UserState.base)
-
 
 
 @bot.message_handler(state=AdminState.admin, commands=["qcreate"], func=lambda message: time.time() - message.date < 60)
