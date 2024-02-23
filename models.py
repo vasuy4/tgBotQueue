@@ -10,7 +10,7 @@ from datetime import datetime
 import traceback
 import requests
 
-from config import DB_PATH, AI_API_KEY
+from config import DB_PATH, AI_API_KEY, TRANSLATOR_API_KEY, TRANSLATOR_API_URL
 
 db = SqliteDatabase(DB_PATH)
 
@@ -134,6 +134,26 @@ def get_userqueue(bot, message):
     return my_queue, my_user, id_queue, username
 
 
+def translator_api_request(endpoint: str, params={}) -> requests.Response:
+    params['key'] = TRANSLATOR_API_KEY
+    return requests.get(
+        f'{TRANSLATOR_API_URL}/{endpoint}',
+        params=params
+    )
+
+def lookup(lang, msg):
+    response = translator_api_request('lookup', params={
+        'lang':lang,
+        'text':msg.text,
+        'ui':'ru'
+    })
+    print(response)
+    print(response.json())
+    print(response.json().get('def', {}))
+    return response.json().get('def', {})
+
+
+
 def math_ai(message):
     url = "https://robomatic-ai.p.rapidapi.com/api"
 
@@ -156,4 +176,3 @@ def math_ai(message):
     response = requests.post(url, data=payload, headers=headers)
     print(response.json()['out'])
     return response
-    #print(response.json())

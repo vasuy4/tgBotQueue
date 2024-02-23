@@ -1,7 +1,7 @@
 from states import UserState, AdminState
 from config import BOT_TOKEN, DEFAULT_COMMANDS, usernames, ADMIN_PASSWORD, ADMIN_COMMANDS
 from models import User, MyQueue, create_models, UserPlace, tree_queue, all_tree_queue, logging_decorator, get_userqueue
-from models import math_ai
+from models import math_ai, lookup
 
 import datetime
 from peewee import IntegrityError, fn
@@ -527,6 +527,8 @@ def exit_queue(bot, call, myQueue):
 def help_response(message):
     """Ответ пользователю, если была введена неизвестная команда"""
     #bot.send_message(message.from_user.id, "Я не знаю этой команды. Введите /help, если ничего не понимаете")
+    #lookup('ru-en', message)
+
     resp = math_ai(message)
     bot.send_message(message.from_user.id, resp.json()['out'])
 
